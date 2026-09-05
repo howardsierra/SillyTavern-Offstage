@@ -4,9 +4,9 @@
   "requires": [],
   "optional": [],
   "js": "bootstrap.js",
-  "css": "drawer.css",
+  "css": "style.css",
   "author": "Sierra + ChatGPT",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "homePage": "https://github.com/howardsierra/SillyTavern-Offstage",
   "hooks": {
     "activate": "init"
