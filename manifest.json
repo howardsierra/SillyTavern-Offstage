@@ -3,10 +3,10 @@
   "loading_order": 50,
   "requires": [],
   "optional": [],
-  "js": "index.js",
+  "js": "bootstrap.js",
   "css": "style.css",
   "author": "Sierra + ChatGPT",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "homePage": "https://github.com/howardsierra/SillyTavern-Offstage",
   "hooks": {
     "activate": "init"
