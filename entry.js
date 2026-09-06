@@ -1,8 +1,8 @@
 import { init as initBootstrap } from './bootstrap.js';
-import { initAnalyzer } from './analyzer.js';
+import { initAnalyzer } from './analyzer-profile.js';
 
 export function init() {
     initBootstrap();
     initAnalyzer();
-    console.info('[Offstage] v0.4.0 entry initialized');
+    console.info('[Offstage] v0.4.1 entry initialized');
 }
