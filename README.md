@@ -20,7 +20,8 @@ Working foundation:
 - AI-proposed personality traits and favorites routed to the Discovery Inbox
 - **AI Add** for Personality and Favorites
 - **AI Build** for a balanced mini-profile
-- AI Fill preview/edit/select flow before saving suggestions
+- AI Fill preview/edit/select flow
+- Mandatory Discovery Inbox approval before AI Fill suggestions become profile data
 - Active RP Connection Manager profile reuse for analysis and AI Fill
 - Placeholders for Journal, Social, and Music
 
@@ -47,7 +48,9 @@ Manual AI Fill is intentionally less restrictive than automatic analysis because
 - **Profile → AI Build** can propose a balanced mini-profile across traits and favorites.
 - The model reads the character card, recent RP, and existing Offstage state before deciding.
 - **Allow logical headcanon** lets the model make a plausible character-specific choice when canon/context does not explicitly answer the question. These choices are labeled `headcanon`, not canon.
-- Suggestions appear in a preview where they can be edited, unchecked, regenerated, or added.
+- Suggestions first appear in an editable preview where they can be changed, unchecked, or regenerated.
+- Choosing **Send selected to Discovery Inbox** does **not** add them to the character profile.
+- Every AI Fill suggestion must then be explicitly **Accepted**, **Kept Hidden**, or **Rejected** in the Discovery Inbox before it can alter Personality or Favorites.
 - AI Fill will not overwrite duplicate accepted facts.
 
 ## Install for testing
@@ -64,8 +67,9 @@ In SillyTavern, use **Extensions → Install Extension** and paste:
 4. Open Offstage → **Personality** and try **AI Add**.
 5. Open Offstage → **Favorites**, type a category such as `Food`, and try **AI Add**.
 6. Try **AI Build** from the Profile page.
-7. Verify suggestions cite sensible logic, stay setting-aware, and use `headcanon` when extrapolating beyond explicit evidence.
-8. Edit/uncheck suggestions before adding them, then verify saved details persist.
-9. Switch characters and confirm each character keeps a separate profile.
+7. Edit/uncheck suggestions, then send selected suggestions to the Discovery Inbox.
+8. Verify nothing has been added to Personality/Favorites yet.
+9. Accept, Keep Hidden, or Reject each queued AI Fill suggestion and confirm only approved details become profile data.
+10. Switch characters and confirm each character keeps a separate profile.
 
 Group-chat analysis is not enabled yet.
