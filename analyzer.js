@@ -135,7 +135,7 @@ export async function analyze({ manual = false } = {}) {
         const { content, connection } = await generate({
             system: systemPrompt(),
             prompt: userPrompt(character, profile, clamp(settings.analysis.contextMessages, 6, 80, 24)),
-            maxTokens: 900,
+            maxTokens: 3000,
         });
         const parsed = parseJson(content);
 
