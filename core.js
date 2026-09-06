@@ -119,6 +119,9 @@ function defaultSettings() {
             interval: 5,
             contextMessages: 24,
             updateTransient: true,
+            // Name of a chat-completion preset whose generation settings override
+            // the connection profile's own. Empty means use the profile's preset.
+            preset: '',
             history: {},
             lastStatus: 'Ready',
             journal: { enabled: true, threshold: 0.7, minReplies: 8, maxQueued: 2 },

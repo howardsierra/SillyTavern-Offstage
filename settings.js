@@ -5,7 +5,7 @@
 import {
     VERSION, clamp, ctx, escapeHtml, getCurrentCharacter, getSettings, isGroupChat, on, save,
 } from './core.js';
-import { connectionLabel } from './llm.js';
+import { connectionLabel, presetNames } from './llm.js';
 import { STATUS, analyze, isAnalyzing } from './analyzer.js';
 import { openPanel } from './ui.js';
 
@@ -53,7 +53,13 @@ function markup() {
 
                 <hr class="offstage-settings-rule">
 
-                <p class="offstage-settings-lede">Analysis runs on the Connection Manager profile you have selected for roleplay, including its model, preset, and instruct settings. It uses tokens.</p>
+                <p class="offstage-settings-lede">Analysis runs on the Connection Manager profile you have selected for roleplay — its model, API, and instruct settings. It uses tokens.</p>
+
+                <div class="offstage-settings-number">
+                    <label for="offstage-analysis-preset">Preset for analysis</label>
+                    <select id="offstage-analysis-preset" class="text_pole"></select>
+                </div>
+                <p class="offstage-settings-hint">A lean preset with reasoning off keeps analysis cheap and stops long reasoning from truncating the reply. Only the sampler settings are taken; the model and endpoint stay with the connection profile.</p>
 
                 <label class="checkbox_label" for="offstage-analyzer-enabled">
                     <input id="offstage-analyzer-enabled" type="checkbox">
@@ -115,6 +121,24 @@ export function syncSettingsPanel() {
     set('offstage-settings-connection', el => { el.textContent = connectionLabel(); });
     set('offstage-settings-status', el => { el.textContent = settings.analysis.lastStatus || 'Ready'; });
     set('offstage-settings-launcher', el => { el.checked = settings.ui.showLauncher !== false; });
+    set('offstage-analysis-preset', el => {
+        // Rebuilt on every sync so presets saved since load appear without a reload.
+        const chosen = settings.analysis.preset || '';
+        const names = presetNames();
+        const options = ['', ...names];
+        // Keep a chosen preset selectable even if it has since been renamed or deleted.
+        if (chosen && !names.includes(chosen)) options.push(chosen);
+
+        el.replaceChildren(...options.map(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name
+                ? (names.includes(name) ? name : `${name} (missing)`)
+                : '— The connection profile\u2019s own preset —';
+            return option;
+        }));
+        el.value = chosen;
+    });
     set('offstage-analyzer-enabled', el => { el.checked = settings.analysis.enabled !== false; });
     set('offstage-analyzer-transient', el => { el.checked = settings.analysis.updateTransient !== false; });
     set('offstage-analyzer-interval', el => { el.value = clamp(settings.analysis.interval, 1, 50, 5); });
@@ -141,6 +165,13 @@ function bind(panel) {
         settings.ui.showLauncher = Boolean(event.target.checked);
         save();
         applyLauncherPreference();
+    });
+
+    panel.querySelector('#offstage-analysis-preset')?.addEventListener('change', event => {
+        const settings = getSettings();
+        if (!settings) return;
+        settings.analysis.preset = String(event.target.value || '');
+        save();
     });
 
     panel.querySelector('#offstage-analyzer-enabled')?.addEventListener('change', event => {

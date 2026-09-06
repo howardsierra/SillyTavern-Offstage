@@ -791,6 +791,7 @@
 
 .offstage-settings { display: grid; gap: 10px; }
 .offstage-settings-lede { margin: 0; opacity: .8; font-size: 12px; line-height: 1.5; }
+.offstage-settings-hint { margin: -4px 0 0; opacity: .6; font-size: 11px; line-height: 1.5; }
 
 .offstage-settings-readout {
     display: grid;
