@@ -2,7 +2,7 @@
 
 A living-character dashboard for SillyTavern.
 
-## v0.4 prototype
+## v0.5 prototype
 
 Working foundation:
 - Current-character detection
@@ -18,21 +18,37 @@ Working foundation:
 - Manual **Analyze current context now** control
 - Automatic transient Mood / Currently / Energy updates
 - AI-proposed personality traits and favorites routed to the Discovery Inbox
+- **AI Add** for Personality and Favorites
+- **AI Build** for a balanced mini-profile
+- AI Fill preview/edit/select flow before saving suggestions
+- Active RP Connection Manager profile reuse for analysis and AI Fill
 - Placeholders for Journal, Social, and Music
 
-## AI analysis behavior
+## Automatic AI analysis behavior
 
-Offstage uses the model/API currently selected in SillyTavern. This consumes model/API tokens.
+Offstage uses the currently selected SillyTavern Connection Manager profile when one is active, including that profile's provider/model connection. If no Connection Manager profile is selected, it falls back to SillyTavern's active connection. This consumes model/API tokens.
 
 By default it:
 - scans after every 5 character replies;
-- sends up to 24 recent non-system messages plus relevant character-card context;
+- sends recent non-system messages plus relevant character-card context;
 - updates transient Mood / Currently / Energy automatically;
 - queues durable traits and favorites for approval instead of silently making them canon;
 - avoids duplicate discoveries already present in the character's Offstage profile;
 - asks the model to stay setting-aware and avoid inventing unsupported modern preferences in fantasy/historical settings.
 
 You can change the scan interval and context-window size, disable automatic analysis, or run a scan manually from the **Offstage** card under Extensions.
+
+## Manual AI Fill
+
+Manual AI Fill is intentionally less restrictive than automatic analysis because the user explicitly asks the model to help build the character.
+
+- **Personality → AI Add** can suggest Public, Private, or Hidden traits.
+- **Favorites → AI Add** can fill a requested category such as Food, Drink, Color, Scent, Book/Story, Art/Entertainment, Music, Place, Guilty Pleasure, and more.
+- **Profile → AI Build** can propose a balanced mini-profile across traits and favorites.
+- The model reads the character card, recent RP, and existing Offstage state before deciding.
+- **Allow logical headcanon** lets the model make a plausible character-specific choice when canon/context does not explicitly answer the question. These choices are labeled `headcanon`, not canon.
+- Suggestions appear in a preview where they can be edited, unchecked, regenerated, or added.
+- AI Fill will not overwrite duplicate accepted facts.
 
 ## Install for testing
 
@@ -43,13 +59,13 @@ In SillyTavern, use **Extensions → Install Extension** and paste:
 ## Current test checklist
 
 1. Open a single-character chat.
-2. Open **Extensions → Offstage** and confirm the current character is detected.
-3. Tap **Analyze current context now**.
-4. Confirm Mood / Currently / Energy can update from the scan.
-5. Open Offstage's Discovery Inbox and review any proposed traits/favorites.
-6. Test Accept, Keep Hidden, Edit, and Reject.
-7. Continue chatting for the configured number of character replies and confirm an automatic scan runs.
-8. Close/reopen Offstage and verify the character profile persists.
+2. Open **Extensions → Offstage** and confirm the current character and RP connection profile are detected.
+3. Tap **Analyze current context now** and confirm automatic analysis works.
+4. Open Offstage → **Personality** and try **AI Add**.
+5. Open Offstage → **Favorites**, type a category such as `Food`, and try **AI Add**.
+6. Try **AI Build** from the Profile page.
+7. Verify suggestions cite sensible logic, stay setting-aware, and use `headcanon` when extrapolating beyond explicit evidence.
+8. Edit/uncheck suggestions before adding them, then verify saved details persist.
 9. Switch characters and confirm each character keeps a separate profile.
 
 Group-chat analysis is not enabled yet.
