@@ -1,8 +1,10 @@
 import { init as initBootstrap } from './bootstrap.js';
 import { initAnalyzer } from './analyzer-profile.js';
+import { initAiFill } from './ai-fill.js';
 
 export function init() {
     initBootstrap();
     initAnalyzer();
-    console.info('[Offstage] v0.4.1 entry initialized');
+    initAiFill();
+    console.info('[Offstage] v0.5.0 entry initialized');
 }
