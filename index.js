@@ -6,7 +6,7 @@
  */
 
 import { VERSION, ctx, getSettings } from './core.js';
-import { applyTheme, initUi, togglePanel } from './ui.js';
+import { applyTheme, initUi, togglePanel, updateLauncher } from './ui.js';
 import { initApprovals } from './approvals.js';
 import { initLife } from './life.js';
 import { initAnalyzer } from './analyzer.js';
@@ -26,11 +26,14 @@ function createLauncher() {
     button.id = LAUNCHER_ID;
     button.type = 'button';
     button.title = 'Open Offstage';
-    button.innerHTML = '<span class="off-launcher-mark" aria-hidden="true">✦</span><span class="off-launcher-word">Offstage</span>';
+    button.innerHTML = '<span class="off-launcher-mark" aria-hidden="true">✦</span>'
+        + '<span class="off-launcher-word">Offstage</span>'
+        + '<span class="off-launcher-badge" aria-hidden="true" hidden></span>';
     button.addEventListener('click', togglePanel);
     applyTheme(button);
     document.body.appendChild(button);
     applyLauncherPreference();
+    updateLauncher();
 }
 
 function createMenuItem(attempt = 0) {

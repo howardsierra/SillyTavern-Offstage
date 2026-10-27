@@ -4,7 +4,7 @@
  * prompt-context builders, and the internal event bus.
  */
 
-export const VERSION = '0.8.0';
+export const VERSION = '0.8.1';
 export const EXTENSION_KEY = 'offstage';
 export const SCHEMA_VERSION = 2;
 
@@ -74,6 +74,15 @@ export function debounce(fn, wait = 200) {
         clearTimeout(timer);
         timer = setTimeout(() => fn(...args), wait);
     };
+}
+
+/** Touch-first devices: skip autofocus there so the on-screen keyboard does not jump up uninvited. */
+export function prefersTouch() {
+    return globalThis.matchMedia?.('(pointer: coarse)')?.matches === true;
+}
+
+export function prefersReducedMotion() {
+    return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
 }
 
 export const toast = {

@@ -8,7 +8,7 @@
 
 import {
     ACTION, CHANGED, JOURNAL_KINDS, PLAYLIST_KINDS, PROVENANCE, SOCIAL_ACCOUNTS,
-    clamp, emit, escapeHtml, getCurrentCharacter, getProfile, labelFor, on, save, uid,
+    clamp, emit, escapeHtml, getCharacterImage, getCurrentCharacter, getProfile, labelFor, on, save, uid,
 } from './core.js';
 import { openModal } from './modal.js';
 
@@ -26,12 +26,16 @@ function provenanceOf(item) {
     return PROVENANCE.includes(item?.provenance) ? item.provenance : 'headcanon';
 }
 
-/** Long text collapses to six lines with a toggle; short text is shown whole. */
+/** Long text collapses to six lines with a toggle; short text is shown whole. The toggle is handled in ui.js. */
 function body(text, className) {
     const value = String(text ?? '');
     if (!value.trim()) return `<p class="${className} off-quiet">Nothing written.</p>`;
     if (value.length <= CLAMP_AT) return `<p class="${className}">${escapeHtml(value)}</p>`;
-    return `<details class="off-clamp"><summary></summary><p class="${className}">${escapeHtml(value)}</p></details>`;
+    return `
+        <div class="off-clamp">
+            <p class="${className}">${escapeHtml(value)}</p>
+            <button class="off-link off-clamp-toggle" type="button" data-action="toggle-clamp" aria-expanded="false">Read all</button>
+        </div>`;
 }
 
 function sealed(kind) {
@@ -61,13 +65,16 @@ function aiButton(target, label) {
     return `<button class="off-btn off-btn-ai" type="button" data-action="ai-fill" data-target="${target}">${escapeHtml(label)}</button>`;
 }
 
+const NOUNS = { journal: 'entry', post: 'post' };
+
 function toolbar(item, kind) {
     const locked = item.hidden === true && item.revealed !== true;
+    const noun = NOUNS[kind] || kind;
     return `
         <span class="off-tag off-tag-provenance">${provenanceOf(item)}</span>
         ${locked ? `<button class="off-link" type="button" data-action="reveal-${kind}">Reveal</button>` : ''}
-        <button class="off-link" type="button" data-action="edit-${kind}">Edit</button>
-        <button class="off-remove" type="button" data-action="delete-${kind}">Remove</button>`;
+        <button class="off-link" type="button" data-action="edit-${kind}" aria-label="Edit ${noun}">Edit</button>
+        <button class="off-remove" type="button" data-action="delete-${kind}" aria-label="Remove ${noun}">Remove</button>`;
 }
 
 /* ----------------------------------------------------------------- routing */
@@ -153,6 +160,15 @@ function handleFor(profile, post) {
     return `@${name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`;
 }
 
+/** A broken image removes itself (see ui.js), leaving the initial underneath. */
+function avatar() {
+    const character = getCurrentCharacter();
+    const image = getCharacterImage(character);
+    const initial = (character?.name || '?').trim().charAt(0).toUpperCase() || '?';
+    return `<span class="off-post-avatar" aria-hidden="true"><b>${escapeHtml(initial)}</b>${image
+        ? `<img src="${escapeHtml(image)}" alt="" loading="lazy" decoding="async">` : ''}</span>`;
+}
+
 function socialPage(profile) {
     const counts = Object.fromEntries(SOCIAL_ACCOUNTS.map(([key]) =>
         [key, profile.social.filter(post => post.account === key).length]));
@@ -197,15 +213,17 @@ function socialPost(profile, post) {
         <article class="off-post ${isDraft ? 'is-draft' : ''}" data-account="${post.account}"
             data-provenance="${provenanceOf(post)}" data-post-id="${escapeHtml(post.id)}">
             <div class="off-post-head">
-                <span class="off-post-handle">${escapeHtml(handleFor(profile, post))}</span>
-                <span class="off-tag">${escapeHtml(labelFor(SOCIAL_ACCOUNTS, post.account))}</span>
-                ${post.date ? `<span class="off-post-date">${escapeHtml(post.date)}</span>` : ''}
+                ${avatar()}
+                <div class="off-post-who">
+                    <span class="off-post-handle">${escapeHtml(handleFor(profile, post))}</span>
+                    <span class="off-post-meta">${escapeHtml(labelFor(SOCIAL_ACCOUNTS, post.account))}${post.date ? ` · ${escapeHtml(post.date)}` : ''}</span>
+                </div>
             </div>
             ${locked ? sealed('this post is') : body(post.body, 'off-post-body')}
             ${!locked && !isDraft ? `
                 <div class="off-post-stats">
-                    <span>${clamp(post.likes, 0, 9999999, 0)} likes</span>
-                    <span>${comments.length} ${comments.length === 1 ? 'reply' : 'replies'}</span>
+                    <span><span aria-hidden="true">♥</span> ${clamp(post.likes, 0, 9999999, 0).toLocaleString()} ${post.likes === 1 ? 'like' : 'likes'}</span>
+                    <span><span aria-hidden="true">↩</span> ${comments.length} ${comments.length === 1 ? 'reply' : 'replies'}</span>
                 </div>` : ''}
             ${!locked && comments.length ? `
                 <ul class="off-comments">
@@ -272,6 +290,7 @@ function playlist(list) {
     return `
         <section class="off-pl" data-playlist-id="${escapeHtml(list.id)}" data-provenance="${provenanceOf(list)}">
             <div class="off-pl-head">
+                <span class="off-pl-cover" aria-hidden="true">♪</span>
                 <h3>${escapeHtml(list.name)}</h3>
                 <span class="off-tag">${escapeHtml(labelFor(PLAYLIST_KINDS, list.kind))}</span>
                 <span class="off-count">${tracks.length}</span>
@@ -287,14 +306,14 @@ function playlist(list) {
                                 ${track.artist ? `<span class="off-track-artist">${escapeHtml(track.artist)}</span>` : ''}
                                 ${track.note ? `<span class="off-track-note">${escapeHtml(track.note)}</span>` : ''}
                             </span>
-                            <button class="off-remove" type="button" data-action="delete-track" aria-label="Remove track">Remove</button>
+                            <button class="off-remove" type="button" data-action="delete-track" aria-label="Remove ${escapeHtml(track.title || 'track')}">Remove</button>
                         </li>`).join('')}
                 </ol>` : `<p class="off-quiet">No tracks yet.</p>`}
             <div class="off-log-foot">
                 <span class="off-tag off-tag-provenance">${provenanceOf(list)}</span>
                 <button class="off-link" type="button" data-action="add-track">Add track</button>
                 <button class="off-link" type="button" data-action="edit-playlist">Edit</button>
-                <button class="off-remove" type="button" data-action="delete-playlist">Remove</button>
+                <button class="off-remove" type="button" data-action="delete-playlist" aria-label="Remove playlist">Remove</button>
             </div>
         </section>`;
 }

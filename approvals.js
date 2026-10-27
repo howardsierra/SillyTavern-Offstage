@@ -135,7 +135,8 @@ function accept(profile, item, { forceHidden = false } = {}) {
             id: uid('journal'),
             kind: item.kind || 'entry',
             date: item.date || '',
-            title: item.title && item.title !== item.date ? item.title : '',
+            // The inbox falls back to the date or the kind label for a title; neither is a real title.
+            title: item.title && item.title !== item.date && item.title !== labelFor(JOURNAL_KINDS, item.kind) ? item.title : '',
             body: item.body,
             mood: item.mood || '',
             provenance: item.provenance || 'headcanon',

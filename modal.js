@@ -4,7 +4,7 @@
  * social / music pages can all open one without importing each other.
  */
 
-import { applyTheme, escapeHtml } from './core.js';
+import { applyTheme, escapeHtml, prefersTouch } from './core.js';
 
 export const MODAL_ID = 'offstage-modal';
 
@@ -16,6 +16,7 @@ export const MODAL_ID = 'offstage-modal';
  */
 export function openModal({ title, subtitle = '', fields = [], submitLabel = 'Save', onSubmit }) {
     document.getElementById(MODAL_ID)?.remove();
+    const opener = document.activeElement;
 
     const wrap = document.createElement('div');
     wrap.id = MODAL_ID;
@@ -23,7 +24,8 @@ export function openModal({ title, subtitle = '', fields = [], submitLabel = 'Sa
     applyTheme(wrap);
     wrap.innerHTML = `
         <div class="off-modal-backdrop" data-modal-close></div>
-        <form class="off-modal" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}">
+        <form class="off-modal" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}" tabindex="-1" novalidate>
+            <span class="off-grabber" aria-hidden="true"></span>
             <div class="off-modal-head">
                 <h3>${escapeHtml(title)}</h3>
                 ${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}
@@ -36,8 +38,13 @@ export function openModal({ title, subtitle = '', fields = [], submitLabel = 'Sa
         </form>`;
     document.body.appendChild(wrap);
 
+    const dismiss = () => {
+        wrap.remove();
+        if (opener instanceof HTMLElement && document.contains(opener)) opener.focus({ preventScroll: true });
+    };
+
     wrap.querySelectorAll('[data-modal-close]').forEach(element =>
-        element.addEventListener('click', () => wrap.remove()));
+        element.addEventListener('click', dismiss));
 
     wrap.querySelectorAll('input[type="range"]').forEach(input => {
         input.addEventListener('input', () => {
@@ -49,7 +56,7 @@ export function openModal({ title, subtitle = '', fields = [], submitLabel = 'Sa
     wrap.addEventListener('keydown', event => {
         if (event.key === 'Escape') {
             event.stopPropagation();
-            wrap.remove();
+            dismiss();
         }
     });
 
@@ -60,7 +67,12 @@ export function openModal({ title, subtitle = '', fields = [], submitLabel = 'Sa
         onSubmit?.(values);
     });
 
-    requestAnimationFrame(() => wrap.querySelector('input, select, textarea')?.focus());
+    requestAnimationFrame(() => {
+        const form = wrap.querySelector('form');
+        const first = wrap.querySelector('input, select, textarea');
+        // On touch, focusing a field would throw the keyboard up before the sheet is even read.
+        (prefersTouch() || !first ? form : first)?.focus({ preventScroll: true });
+    });
 }
 
 function modalField(field) {
@@ -80,6 +92,8 @@ function modalField(field) {
     if (field.type === 'textarea') {
         return `<label><span>${label}</span>${hint}<textarea name="${name}" rows="4" placeholder="${escapeHtml(field.placeholder ?? '')}">${escapeHtml(field.value ?? '')}</textarea></label>`;
     }
+    const type = field.type || 'text';
+    const numeric = type === 'number' ? ' inputmode="numeric" min="0"' : '';
     return `<label><span>${label}</span>${hint}
-        <input name="${name}" type="${field.type || 'text'}" value="${escapeHtml(field.value ?? '')}" placeholder="${escapeHtml(field.placeholder ?? '')}"></label>`;
+        <input name="${name}" type="${escapeHtml(type)}"${numeric} autocomplete="off" value="${escapeHtml(field.value ?? '')}" placeholder="${escapeHtml(field.placeholder ?? '')}"></label>`;
 }

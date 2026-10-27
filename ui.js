@@ -25,13 +25,37 @@ const TABS = [
     ['music', 'Music'],
 ];
 
+const LAUNCHER_ID = 'offstage-launcher';
+
+/** Elements that carry an item id; used to put focus back after a re-render. */
+const HOLDERS = ['data-track-id', 'data-trait-id', 'data-favorite-id', 'data-discovery-id', 'data-entry-id', 'data-post-id', 'data-playlist-id'];
+
+/** How long a Remove button stays armed waiting for the confirming tap. */
+const ARM_MS = 3200;
+
 let activeTab = 'profile';
 let lastFocused = null;
+let compact = false;
 
 /* ------------------------------------------------------------------ theme */
 
 function refreshThemedElements() {
     for (const element of document.querySelectorAll('.offstage-theme')) applyTheme(element);
+}
+
+/** Pending-review count on the floating button. */
+export function updateLauncher() {
+    const launcher = document.getElementById(LAUNCHER_ID);
+    if (!launcher) return;
+    const pending = getCurrentCharacter() ? (getProfile(false)?.discoveries?.length ?? 0) : 0;
+    const badge = launcher.querySelector('.off-launcher-badge');
+    if (badge) {
+        badge.textContent = pending > 99 ? '99+' : String(pending);
+        badge.hidden = pending === 0;
+    }
+    launcher.setAttribute('aria-label', pending
+        ? `Open Offstage, ${pending} waiting to review`
+        : 'Open Offstage');
 }
 
 /* ------------------------------------------------------------- open/close */
@@ -53,7 +77,8 @@ export function openPanel() {
     }
     root.classList.add('is-open');
     activeTab = getStoredTab();
-    render();
+    compact = false;
+    render({ resetScroll: true });
     requestAnimationFrame(() => {
         root.querySelector('.off-tab.is-active')?.focus({ preventScroll: true });
     });
@@ -101,6 +126,7 @@ export function goToTab(tab) {
 export function refresh({ resetScroll = false } = {}) {
     if (isOpen()) render({ resetScroll });
     refreshThemedElements();
+    updateLauncher();
 }
 
 function render({ resetScroll = false } = {}) {
@@ -108,6 +134,9 @@ function render({ resetScroll = false } = {}) {
     if (!root) return;
 
     const previousScroll = resetScroll ? 0 : (root.querySelector('.off-content')?.scrollTop ?? 0);
+    const previousTabs = root.querySelector('.off-tabs')?.scrollLeft ?? 0;
+    const focus = focusSelector(root);
+    if (resetScroll) compact = false;
     applyTheme(root);
 
     const character = getCurrentCharacter();
@@ -117,8 +146,45 @@ function render({ resetScroll = false } = {}) {
         ? shell(unavailableState())
         : shell(panelBody(character, profile));
 
+    root.querySelector('.off-shell')?.classList.toggle('is-compact', compact);
+
     const content = root.querySelector('.off-content');
     if (content) content.scrollTop = previousScroll;
+
+    // The tab strip scrolls sideways on narrow screens; without this it snaps
+    // back to the start on every render and hides the tab you are on.
+    const tabs = root.querySelector('.off-tabs');
+    if (tabs) {
+        tabs.scrollLeft = previousTabs;
+        revealActiveTab(tabs);
+    }
+
+    if (focus) root.querySelector(focus)?.focus({ preventScroll: true });
+}
+
+function revealActiveTab(tabs) {
+    const active = tabs.querySelector('.off-tab.is-active');
+    if (!(active instanceof HTMLElement)) return;
+    const start = active.offsetLeft - 16;
+    const end = active.offsetLeft + active.offsetWidth + 16;
+    if (start < tabs.scrollLeft) tabs.scrollLeft = start;
+    else if (end > tabs.scrollLeft + tabs.clientWidth) tabs.scrollLeft = end - tabs.clientWidth;
+}
+
+/** A selector that finds the focused control again after the panel is rebuilt. */
+function focusSelector(root) {
+    const element = document.activeElement;
+    if (!(element instanceof HTMLElement) || !root.contains(element) || !element.dataset.action) return null;
+
+    const own = ['action', 'tab', 'filter', 'swatch', 'decision', 'target']
+        .filter(key => element.dataset[key])
+        .map(key => `[data-${key}="${CSS.escape(element.dataset[key])}"]`)
+        .join('');
+
+    const holder = element.closest(HOLDERS.map(attribute => `[${attribute}]`).join(','));
+    const attribute = holder && HOLDERS.find(name => holder.hasAttribute(name));
+    const scope = attribute ? `[${attribute}="${CSS.escape(holder.getAttribute(attribute))}"] ` : '';
+    return `${scope}${own}`;
 }
 
 function shell(inner) {
@@ -129,6 +195,10 @@ function closeButton() {
     return `<button class="off-close" type="button" data-action="close" aria-label="Close Offstage"><span aria-hidden="true">×</span><span class="off-close-word">Close</span></button>`;
 }
 
+function wordmark() {
+    return `<p class="off-wordmark"><span aria-hidden="true">✦</span> Offstage</p>`;
+}
+
 function unavailableState() {
     const message = isGroupChat()
         ? { title: 'One character at a time', body: 'Offstage keeps a separate dossier per character. Open a single-character chat to build one.' }
@@ -137,7 +207,7 @@ function unavailableState() {
     return `
         <header class="off-hero off-hero-blank">
             ${closeButton()}
-            <p class="off-wordmark">Offstage</p>
+            ${wordmark()}
         </header>
         <div class="off-content">
             ${emptyState(message.title, message.body)}
@@ -147,13 +217,14 @@ function unavailableState() {
 function panelBody(character, profile) {
     const image = getCharacterImage(character);
     const pending = profile.discoveries.length;
+    const energy = clamp(profile.energy, 0, 100, 50);
 
     return `
         <header class="off-hero">
-            ${image ? `<img class="off-hero-image" src="${escapeHtml(image)}" alt="">` : ''}
+            ${image ? `<img class="off-hero-image" src="${escapeHtml(image)}" alt="" decoding="async">` : ''}
             <div class="off-hero-scrim"></div>
             ${closeButton()}
-            <p class="off-wordmark">Offstage</p>
+            ${wordmark()}
             <div class="off-hero-copy">
                 <h1 class="off-name">${escapeHtml(character.name || 'Unknown character')}</h1>
                 <button class="off-tagline" type="button" data-action="edit-tagline">
@@ -164,7 +235,8 @@ function panelBody(character, profile) {
                 <dl class="off-callsheet">
                     ${callsheetRow('Mood', profile.mood || 'Unwritten', 'mood')}
                     ${callsheetRow('Currently', profile.currentState || 'Waiting to be discovered', 'currentState')}
-                    ${callsheetRow('Energy', `${clamp(profile.energy, 0, 100, 50)}%`, 'energy')}
+                    ${callsheetRow('Energy', `${energy}%`, 'energy',
+                        `<span class="off-callsheet-meter" aria-hidden="true"><span style="width:${energy}%"></span></span>`)}
                 </dl>
             </div>
         </header>
@@ -173,20 +245,23 @@ function panelBody(character, profile) {
             ${TABS.map(([id, label]) => {
                 const isActive = activeTab === id;
                 const badge = id === 'discoveries' && pending
-                    ? `<span class="off-tab-badge">${pending}</span>` : '';
-                return `<button class="off-tab ${isActive ? 'is-active' : ''}" type="button" role="tab"
-                    aria-selected="${isActive}" data-action="tab" data-tab="${id}">${label}${badge}</button>`;
+                    ? `<span class="off-tab-badge" aria-label="${pending} waiting">${pending}</span>` : '';
+                return `<button class="off-tab ${isActive ? 'is-active' : ''}" type="button" role="tab" id="offstage-tab-${id}"
+                    aria-selected="${isActive}" aria-controls="offstage-tabpanel" tabindex="${isActive ? 0 : -1}"
+                    data-action="tab" data-tab="${id}">${label}${badge}</button>`;
             }).join('')}
         </nav>
 
-        <div class="off-content" role="tabpanel">${page(character, profile)}</div>`;
+        <div class="off-content" id="offstage-tabpanel" role="tabpanel" aria-labelledby="offstage-tab-${activeTab}">${page(character, profile)}</div>`;
 }
 
-function callsheetRow(label, value, field) {
+function callsheetRow(label, value, field, extra = '') {
     return `
-        <div class="off-callsheet-row">
+        <div class="off-callsheet-row" data-field="${field}">
             <dt>${escapeHtml(label)}</dt>
-            <dd><button type="button" data-action="edit-field" data-field="${field}">${escapeHtml(value)}</button></dd>
+            <dd><button type="button" data-action="edit-field" data-field="${field}" aria-label="Edit ${escapeHtml(label.toLowerCase())}: ${escapeHtml(value)}">
+                <span class="off-callsheet-val">${escapeHtml(value)}</span>${extra}
+            </button></dd>
         </div>`;
 }
 
@@ -211,18 +286,21 @@ function profilePage(character, profile) {
         <div class="off-page">
             <div class="off-page-head">
                 <h2>What we know so far</h2>
-                <label class="off-theme">
-                    <span>Theme</span>
-                    <select data-action="theme">
-                        ${THEMES.map(theme => `<option value="${theme}" ${profile.theme === theme ? 'selected' : ''}>${theme[0].toUpperCase() + theme.slice(1)}</option>`).join('')}
-                    </select>
-                </label>
+                <div class="off-swatches" role="radiogroup" aria-label="Theme">
+                    ${THEMES.map(theme => {
+                        const name = theme[0].toUpperCase() + theme.slice(1);
+                        const selected = profile.theme === theme;
+                        return `<button class="off-swatch ${selected ? 'is-active' : ''}" type="button" role="radio"
+                            aria-checked="${selected}" aria-label="${name} theme" title="${name}"
+                            data-action="theme" data-swatch="${theme}"><span></span></button>`;
+                    }).join('')}
+                </div>
             </div>
 
             <div class="off-tally">
                 ${tally(traitCount, traitCount === 1 ? 'trait' : 'traits', 'personality')}
                 ${tally(revealed, revealed === 1 ? 'known taste' : 'known tastes', 'favorites')}
-                ${tally(pending, pending === 1 ? 'waiting to review' : 'waiting to review', 'discoveries')}
+                ${tally(pending, 'waiting to review', 'discoveries')}
             </div>
 
             ${aiButton('profile', 'Suggest a starting profile')}
@@ -378,6 +456,9 @@ function discoveryCard(item) {
     const confidence = Number.isFinite(Number(item.confidence))
         ? `${Math.round(clamp(item.confidence, 0, 1, 0.7) * 100)}% fit`
         : '';
+    const isTrait = !['favorite', 'journal', 'social', 'track'].includes(item.target);
+    // AI Fill sends its one-sentence rationale as both summary and reason; show it once.
+    const reason = item.reason && item.reason !== item.summary ? item.reason : '';
     const detail = item.target === 'favorite'
         ? `${escapeHtml(item.category || 'Favourite')}: ${escapeHtml(item.favoriteValue || '')}`
         : item.target === 'track'
@@ -392,11 +473,11 @@ function discoveryCard(item) {
             ${item.body ? `<p class="off-proposal-body">${escapeHtml(item.body)}</p>` : ''}
             ${item.target === 'track' && item.playlist ? `<p class="off-proposal-summary">Goes on ${escapeHtml(item.playlist)}</p>` : ''}
             ${item.summary ? `<p class="off-proposal-summary">${escapeHtml(item.summary)}</p>` : ''}
-            ${item.reason ? `<p class="off-proposal-reason">${escapeHtml(item.reason)}</p>` : ''}
+            ${reason ? `<p class="off-proposal-reason">${escapeHtml(reason)}</p>` : ''}
             <div class="off-proposal-foot">
                 <span class="off-tag off-tag-provenance">${provenance}</span>
                 ${confidence ? `<span class="off-tag">${confidence}</span>` : ''}
-                ${item.section ? `<span class="off-tag">${escapeHtml(item.section)}</span>` : ''}
+                ${isTrait && item.section ? `<span class="off-tag">${escapeHtml(item.section)}</span>` : ''}
             </div>
             <div class="off-proposal-actions">
                 <button class="off-btn off-btn-primary" type="button" data-action="discovery" data-decision="accept">Accept</button>
@@ -423,17 +504,68 @@ export function emptyState(title, body) {
 
 function bindRoot(root) {
     root.addEventListener('click', onRootClick);
-    root.addEventListener('change', onRootChange);
+    root.addEventListener('keydown', onRootKeydown);
+    root.addEventListener('scroll', onContentScroll, { capture: true, passive: true });
+    // A missing avatar should fall back to the plain hero, not a broken-image icon.
+    root.addEventListener('error', event => {
+        if (event.target instanceof HTMLImageElement) event.target.remove();
+    }, true);
 }
 
-function onRootChange(event) {
-    const select = event.target.closest('[data-action="theme"]');
-    if (!select) return;
-    const profile = getProfile();
-    if (!profile) return;
-    profile.theme = THEMES.includes(select.value) ? select.value : 'rosewater';
-    save();
-    emit(CHANGED, { reason: 'theme' });
+/** Arrow keys move between tabs, as a tab list should. */
+function onRootKeydown(event) {
+    const tab = event.target instanceof HTMLElement ? event.target.closest('.off-tab') : null;
+    if (!tab) return;
+    const ids = TABS.map(([id]) => id);
+    const index = ids.indexOf(tab.dataset.tab);
+    const next = {
+        ArrowRight: ids[(index + 1) % ids.length],
+        ArrowLeft: ids[(index - 1 + ids.length) % ids.length],
+        Home: ids[0],
+        End: ids[ids.length - 1],
+    }[event.key];
+    if (!next) return;
+    event.preventDefault();
+    setTab(next);
+    document.getElementById(`offstage-tab-${next}`)?.focus({ preventScroll: true });
+}
+
+/**
+ * On short screens the hero folds down to a single line once you scroll, so
+ * the dossier gets the room. Hysteresis keeps it from flickering at the edge.
+ */
+function onContentScroll(event) {
+    const content = event.target;
+    if (!(content instanceof HTMLElement) || !content.classList.contains('off-content')) return;
+    const shell = content.closest('.off-shell');
+    if (!shell) return;
+
+    const top = content.scrollTop;
+    if (!compact && top > 56) {
+        const hero = shell.querySelector('.off-hero');
+        // Folding hands the hero's height to the content; only fold if there
+        // is still something to scroll afterwards, or it would unfold at once.
+        const room = content.scrollHeight - content.clientHeight;
+        if (room <= (hero?.offsetHeight ?? 0) - 40) return;
+        compact = true;
+    } else if (compact && top < 8) {
+        compact = false;
+    } else {
+        return;
+    }
+    shell.classList.toggle('is-compact', compact);
+}
+
+/** First tap arms a Remove button, the second one within a few seconds removes. */
+function armRemove(button) {
+    button.classList.add('is-armed');
+    button.dataset.label = button.textContent;
+    button.textContent = 'Tap again to remove';
+    setTimeout(() => {
+        if (!document.contains(button)) return;
+        button.classList.remove('is-armed');
+        button.textContent = button.dataset.label || 'Remove';
+    }, ARM_MS);
 }
 
 function onRootClick(event) {
@@ -441,6 +573,11 @@ function onRootClick(event) {
     if (!(trigger instanceof HTMLElement)) return;
     const action = trigger.dataset.action;
     const profile = getProfile();
+
+    if (trigger.classList.contains('off-remove') && !trigger.classList.contains('is-armed')) {
+        armRemove(trigger);
+        return;
+    }
 
     switch (action) {
         case 'close':
@@ -451,12 +588,28 @@ function onRootClick(event) {
             setTab(trigger.dataset.tab);
             return;
 
+        case 'theme':
+            if (!profile) return;
+            profile.theme = THEMES.includes(trigger.dataset.swatch) ? trigger.dataset.swatch : 'rosewater';
+            save();
+            emit(CHANGED, { reason: 'theme' });
+            return;
+
+        case 'toggle-clamp': {
+            const box = trigger.closest('.off-clamp');
+            if (!box) return;
+            const expanded = box.classList.toggle('is-open');
+            trigger.setAttribute('aria-expanded', String(expanded));
+            trigger.textContent = expanded ? 'Show less' : 'Read all';
+            return;
+        }
+
         case 'edit-tagline':
             if (!profile) return;
             openModal({
                 title: 'Tagline',
                 subtitle: 'A private one-liner for your own reference.',
-                fields: [{ name: 'tagline', label: 'Tagline', value: profile.tagline, placeholder: 'Not nearly as subtle as he thinks.' }],
+                fields: [{ name: 'tagline', label: 'Tagline', value: profile.tagline, placeholder: 'Not nearly as subtle as they think.' }],
                 onSubmit: values => {
                     profile.tagline = String(values.tagline || '').trim();
                     save();

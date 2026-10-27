@@ -7,7 +7,8 @@
 
 import {
     ACTION, CHANGED, JOURNAL_KINDS, PLAYLIST_KINDS, SECTIONS, SOCIAL_ACCOUNTS,
-    applyTheme, clamp, emit, escapeHtml, getCurrentCharacter, getSettings, on, save, toast,
+    applyTheme, clamp, emit, escapeHtml, getCurrentCharacter, getSettings, on,
+    prefersReducedMotion, prefersTouch, save, toast,
 } from './core.js';
 import { connectionLabel, describeError } from './llm.js';
 import { generateSuggestions, isWritten, toProposal } from './writing.js';
@@ -58,7 +59,7 @@ function open(target) {
     applyTheme(sheet);
     sheet.innerHTML = `
         <div class="off-sheet-backdrop" data-sheet-close></div>
-        <section class="off-sheet" role="dialog" aria-modal="true" aria-label="${escapeHtml(copy.title)}">
+        <section class="off-sheet" role="dialog" aria-modal="true" aria-label="${escapeHtml(copy.title)}" tabindex="-1">
             <header class="off-sheet-head">
                 <div>
                     <h2>${escapeHtml(copy.title)}</h2>
@@ -70,7 +71,7 @@ function open(target) {
             </header>
 
             <div class="off-sheet-body">
-                <p class="off-sheet-connection">Running on ${escapeHtml(connectionLabel())}</p>
+                <p class="off-sheet-connection"><span aria-hidden="true">●</span> Running on ${escapeHtml(connectionLabel())}</p>
                 ${fields(target)}
                 <label>
                     <span>Anything to steer it</span>
@@ -98,7 +99,14 @@ function open(target) {
     sheet.addEventListener('keydown', event => {
         if (event.key === 'Escape') { event.stopPropagation(); close(); }
     });
-    requestAnimationFrame(() => sheet.querySelector('input, select, textarea')?.focus());
+    requestAnimationFrame(() => {
+        const first = sheet.querySelector('.off-sheet-body input, .off-sheet-body select, .off-sheet-body textarea');
+        (prefersTouch() || !first ? sheet.querySelector('.off-sheet') : first)?.focus({ preventScroll: true });
+    });
+}
+
+function reveal(element) {
+    element?.scrollIntoView({ block: 'start', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
 }
 
 function countField(min, max, value) {
@@ -206,9 +214,9 @@ function meta(item) {
 function resultCard(item, index) {
     const shell = inner => `
         <article class="off-result" data-index="${index}" data-kind="${item.kind}" data-provenance="${item.provenance}">
-            <label class="off-check off-result-pick">
-                <input type="checkbox" class="off-pick" checked aria-label="Include this suggestion">
-                <span class="off-visually-hidden">Include</span>
+            <label class="off-result-pick" title="Include this suggestion">
+                <input type="checkbox" class="off-pick" checked>
+                <span class="off-visually-hidden">Include this suggestion</span>
             </label>
             <div class="off-result-body">${inner}</div>
         </article>`;
@@ -308,6 +316,10 @@ function renderResults(items) {
         </div>`;
 
     host.querySelector('#off-send').addEventListener('click', send);
+    for (const pick of host.querySelectorAll('.off-pick')) {
+        pick.addEventListener('change', () => pick.closest('.off-result')?.classList.toggle('is-skipped', !pick.checked));
+    }
+    reveal(host);
     host.querySelector('#off-regenerate').addEventListener('click', () => {
         const target = document.getElementById(SHEET_ID)?.dataset.target;
         if (target) void run(target);
@@ -339,7 +351,7 @@ async function run(target) {
     generating = true;
     if (button) { button.disabled = true; button.textContent = 'Thinking…'; }
     if (host) {
-        host.innerHTML = `<p class="off-sheet-status">${writes
+        host.innerHTML = `<p class="off-sheet-status is-busy" role="status">${writes
             ? `Working out how ${escapeHtml(character.name)} would put it…`
             : `Reading ${escapeHtml(character.name)}'s card and recent roleplay…`}</p>`;
     }
@@ -349,7 +361,7 @@ async function run(target) {
     } catch (error) {
         console.error('[Offstage] AI Fill failed:', error);
         if (host) {
-            host.innerHTML = `<p class="off-sheet-status off-sheet-error">Could not generate suggestions. ${escapeHtml(describeError(error))}</p>`;
+            host.innerHTML = `<p class="off-sheet-status off-sheet-error" role="alert">Could not generate suggestions. ${escapeHtml(describeError(error))}</p>`;
         }
         toast.error(`AI Fill failed. ${describeError(error)}`);
     } finally {

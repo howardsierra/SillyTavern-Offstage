@@ -97,6 +97,37 @@ belongs to in a group, so it stays out of the way there.
 | `settings.js` | The card under Extensions. |
 | `style.css` | Design tokens, six themes, all components. |
 
+## 0.8.1
+
+A visual pass, and the panel now works properly on a phone.
+
+The hero shows mood, status, and energy as tiles, with a meter for energy. Tabs are pills.
+Themes are picked from swatches instead of a dropdown. Cards, posts, playlists, and empty states
+were restyled throughout, and social posts carry the character's avatar.
+
+On touch screens:
+
+- Every control is at least 44px, and inputs are 16px so iOS no longer zooms the page when one
+  takes focus.
+- Editing dialogs open as bottom sheets with the buttons in thumb reach, and no longer throw the
+  keyboard up before you have read them.
+- The header folds to a single line once you scroll, so the dossier gets the room.
+- Remove asks for a second tap, so a stray touch can't delete anything.
+- Hover effects only apply on devices that can hover, so nothing stays stuck highlighted.
+- The floating button shrinks to an icon on narrow screens and shows how many discoveries are
+  waiting.
+
+Fixed:
+
+- The tab strip snapped back to the start on every change, hiding the tab you were on.
+- AI Fill proposals showed the same sentence twice in Discoveries.
+- Journal, post, and song proposals were tagged "private", which meant nothing for them.
+- Approving a journal proposal with no date gave the entry its kind ("Diary entry") as a title.
+- "Read all" on long entries relied on a `<details>` layout some browsers ignore.
+- A missing avatar showed a broken-image icon instead of the plain header.
+- Focus was lost after every action; it now returns to the control you used. Arrow keys move
+  between tabs.
+
 ## 0.8.0
 
 Journal and social entries can now be written without being asked for.
